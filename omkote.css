@@ -1,0 +1,41 @@
+.window-port {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+}
+
+.window {
+  position: absolute;
+  margin: 0px;
+  background-color: #ffffee;}
+
+.buffer-window {
+  position: absolute;
+  overflow: scroll;
+  overflow-x: hidden;
+  font-family: Palatino, Georgia, serif;
+  font-size: 12px;
+  padding: 6px 10px 6px 10px;
+
+}
+
+.grid-window {
+  background: #FFD0A0;
+  overflow: hidden;
+  font-family: monospace; /* necessary! */
+  font-size: 12px;
+  padding: 6px 10px 6px 10px;
+}
+
+.buffer-window input {
+  /* This class mimicks the Style_input class. It also eliminates the 
+     usual decoration of an <input> field, as much as possible. */
+  border: none;
+  margin: 0px;
+  padding: 0px;
+  outline-width: 0px;
+  outline-style: none;
+  background: none;
+  font-weight: bold;
+  width: 100%;
+}
