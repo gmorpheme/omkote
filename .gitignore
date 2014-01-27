@@ -7,3 +7,6 @@ pom.xml
 .lein-deps-sum
 .lein-repl-history
 .lein-plugins/
+/samples/demobase/out/
+/test-out/
+/samples/demobase/main.js
