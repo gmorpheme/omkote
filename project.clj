@@ -1,13 +1,16 @@
 (defproject omkote "0.1.0-SNAPSHOT"
-  :description "FIXME: write this!"
-  :url "http://example.com/FIXME"
+  :description "Om-based knock-off of GlkOte."
+  :url "http://github.com/gmorpheme/omkote"
 
   :dependencies [[org.clojure/clojure "1.5.1"]
-                 [org.clojure/clojurescript "0.0-2138"]
-                 [om "0.3.0"]
+                 [org.clojure/clojurescript "0.0-2156"]
+                 [om "0.4.0"]
                  [org.clojure/core.async "0.1.267.0-0d7780-alpha"]
                  [com.cemerick/clojurescript.test "0.2.1"]]
 
+  :repositories [["gmorpheme-snapshots" {:url "http://dev.gmorpheme.net/artifactory/libs-snapshot"}]]
+  :deploy-repositories [["gmorpheme-snapshots" {:url "http://dev.gmorpheme.net/artifactory/libs-snapshot-local"}]]
+  
   :plugins [[lein-cljsbuild "1.0.1"]]
 
   :source-paths ["src"]

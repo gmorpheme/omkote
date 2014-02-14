@@ -20,7 +20,7 @@
 ;; :text, :hyperlink. However a shorthand can be used in updates which
 ;; consists of alternating pairs of style / text in an array.
 
-(defn normalise-line-data-array 
+(defn normalise-line-data-array
   "Normalise 'shorthand' representation [style1 string1 {:style style2 :text string2} style2 string3]
 (a line data array) to vector of maps. Also expand [] to a single blank span."
   [lda]
@@ -104,9 +104,17 @@
 (defn apply-update
   "Apply an update message to the game state."
   [{content-updates :content input-updates :input :as msg} g]
+  {:pre [(not (nil? g))]}
   (-> g
       (update-in [:windows] (partial apply-content-updates content-updates))
       (update-in [:windows] (partial apply-input-updates input-updates))))
+
+(defn apply-updates-to-windows
+  "https://github.com/swannodette/om/issues/110"
+  [{content-updates :content input-updates :input :as msg} windows]
+  (->> windows
+       (apply-content-updates content-updates)
+       (apply-input-updates input-updates)))
 
 ;; UI
 
@@ -140,8 +148,8 @@
   "Construct a buffer-window component. Renders the accumulated state
 to divs, sending user input to a channel and contains a go loop to
 respond to incoming requests from the game."
-  
-  [window owner opts]
+
+  [window owner]
 
   (reify
 
@@ -153,9 +161,9 @@ respond to incoming requests from the game."
         (dom/div #js {:id (:id window)
                       :className window-classes
                       :style (map->js (:style window))}
-                 
+
                  (apply dom/div #js {:className "content"}
-                        
+
                         ;; glkote embeds the input in the last paragraph...
                         (let [leading (butlast (:blocks window))
                               final (last (:blocks window))]
@@ -169,23 +177,26 @@ respond to incoming requests from the game."
                                                                  owner)))
                                (render-paragraph final))]))))))))
 
-(defn game-component 
+(defn game-component
   "Builds a responsive game into the specified gameport element."
-  [{:keys [event-channel control-channel] :as game} owner opts]
+  [{:keys [event-channel control-channel] :as game} owner]
   (reify
 
     om/IWillMount
     (will-mount [_]
       (go-loop []
         (when-let [msg (<! control-channel)]
-          (om/transact! game #(apply-update msg %))
+          (om/transact! game [:windows] #(apply-updates-to-windows msg %))
           (recur))))
-    
+
     om/IDidMount
     (did-mount [_ _]
       (put! event-channel {:type :init}))
-    
-    om/IRender 
+
+    om/IRender
     (render [_]
-      (dom/div #js {:className "window-port"}
-               (om/build-all window-component (:windows game) {:init-state {:event-channel event-channel}})))))
+      (apply dom/div
+       #js {:className "window-port"}
+       (om/build-all window-component
+                     (:windows game)
+                     {:init-state {:event-channel event-channel}})))))

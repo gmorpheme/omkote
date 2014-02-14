@@ -4,7 +4,7 @@
 (ns ^{:doc "Equivalent of http://eblong.com/zarf/glk/glkote/sample-demobase.html"}
   samples.demobase.core
   (:require-macros [cljs.core.async.macros :refer [go-loop]])
-  (:require [omkote.core :as omkote :refer [game-state buffer-window-state game-component]]
+  (:require [omkote.core :as omkote :refer [game-component]]
             [om.core :as om]
             [cljs.core.async :refer [<! >! chan]]
             [clojure.string :as string]))
@@ -51,16 +51,18 @@ Just customize the startup() function to print your initial text, and customize 
      :content [{:id 1 :text flattened}]
      :input nil}))
 
+(def game (atom initial-state))
+
 (let [event-channel (chan)
       control-channel (chan)
-      game (atom (assoc initial-state
-                   :event-channel event-channel
-                   :control-channel control-channel))
       prompt ">"]
-  
+
+  (swap! game assoc :event-channel event-channel :control-channel control-channel)
+
   ;; our game implementation:
   (go-loop []
     (when-let [{:keys [type value] :as event} (<! event-channel)]
+      (println "responding to event " event)
       (>! control-channel
           (case type
             :init (game-select (startup) (say prompt))
@@ -69,4 +71,6 @@ Just customize the startup() function to print your initial text, and customize 
       (recur)))
 
   ;; install the component
-  (om/root game game-component (.getElementById js/document "gameport")))
+  (om/root game-component game {:target (.getElementById js/document "gameport")}))
+
+
