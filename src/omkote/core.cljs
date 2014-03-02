@@ -190,7 +190,7 @@ respond to incoming requests from the game."
           (recur))))
 
     om/IDidMount
-    (did-mount [_ _]
+    (did-mount [_]
       (put! event-channel {:type :init}))
 
     om/IRender

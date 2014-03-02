@@ -62,7 +62,6 @@ Just customize the startup() function to print your initial text, and customize 
   ;; our game implementation:
   (go-loop []
     (when-let [{:keys [type value] :as event} (<! event-channel)]
-      (println "responding to event " event)
       (>! control-channel
           (case type
             :init (game-select (startup) (say prompt))
