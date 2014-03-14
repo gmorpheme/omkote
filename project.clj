@@ -8,8 +8,12 @@
                  [org.clojure/core.async "0.1.267.0-0d7780-alpha"]
                  [com.cemerick/clojurescript.test "0.2.1"]]
 
-  :repositories [["gmorpheme-snapshots" {:url "http://dev.gmorpheme.net/artifactory/libs-snapshot"}]]
-  :deploy-repositories [["gmorpheme-snapshots" {:url "http://dev.gmorpheme.net/artifactory/libs-snapshot-local"}]]
+  :repositories [["gmorpheme-snapshots" {:url "http://dev.gmorpheme.net/artifactory/libs-snapshot"
+                                         :username :env/ARTIFACTORY_USERNAME
+                                         :password :env/ARTIFACTORY_PASSWORD}]]
+  :deploy-repositories [["gmorpheme-snapshots" {:url "http://dev.gmorpheme.net/artifactory/libs-snapshot-local"
+                                                :username :env/ARTIFACTORY_USERNAME
+                                                :password :env/ARTIFACTORY_PASSWORD}]]
   
   :plugins [[lein-cljsbuild "1.0.1"]]
 
