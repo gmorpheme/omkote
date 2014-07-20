@@ -45,7 +45,7 @@ Just customize the startup() function to print your initial text, and customize 
 (defn game-select
   "Format update message for the game."
   [& content]
-  (let [flattened (flatten content)]
+  (let [flattened (vec (flatten content))]
     {:type :update
      :windows nil
      :content [{:id 1 :text flattened}]

@@ -109,24 +109,26 @@
             [{:style "normal" :text "And more."}]
             [{:style "normal" :text "Welcome to..."} {:style "header" :text "The Game"}]]))))
 
-(deftest test-apply-content-update
-  (is (= (omkote/apply-content-update example-buffer-update example-buffer-window)
+(deftest test-update-window-content
+  (is (= (omkote/update-window-content example-buffer-window example-buffer-update)
          example-buffer-window-updated))
-  (is (= (omkote/apply-content-update example-grid-update example-grid-window)
+  (is (= (omkote/update-window-content example-grid-window example-grid-update)
          example-grid-window-updated)))
 
 
-(deftest test-apply-content-updates
-  (is (= (omkote/apply-content-updates [example-grid-update example-buffer-update]
-                                       [example-buffer-window example-grid-window])
-         [example-buffer-window-updated example-grid-window-updated])))
+(deftest test-update-window-contents
+  (is (= (omkote/update-windows [example-buffer-update] omkote/update-window-content [example-buffer-window])
+         [example-buffer-window-updated]))
+  (is (= (omkote/update-windows [example-grid-update] omkote/update-window-content [example-grid-window])
+         [example-grid-window-updated])))
 
 
 (deftest test-apply-update
-  (is (= (omkote/apply-update {:type :update
-                               :content [example-grid-update example-buffer-update]}
-                              {:windows [example-buffer-window example-grid-window]})
+  (is (= (omkote/apply-update-message {:windows [example-buffer-window example-grid-window]}
+                                      {:type :update
+                                       :content [example-grid-update example-buffer-update]})
          {:windows [example-buffer-window-updated example-grid-window-updated]})))
 
 ;; this is going into a web page for testing so have them run automatically
 (run-tests 'omkote.tests)
+

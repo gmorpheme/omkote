@@ -13,7 +13,26 @@
 
 (def ENTER-KEY 13)
 
-;; State
+;; Some simple utilities
+
+(defn while-not 
+  "Return function which applies f to its argument until p holds
+   of its argument."
+  [p f]
+  (fn [x]
+    (loop [v x]
+      (if (p v) v (recur (f x))))))
+
+(defn map-slurper
+  "Return function which slurps values from a sequence into a series
+   of maps by overlaying a cycle of specified keys and zipping."
+  [& keys]
+  (let [n (count keys)]
+    (fn [s]
+      (for [group (partition n s)]
+        (zipmap keys group)))))
+
+;;; Game state handling
 
 ;; Following the GlkOte spec a LINE_DATA_ARRAY is a sequence of styled
 ;; spans, represented in full as a vector of maps with keys :style,
@@ -21,102 +40,106 @@
 ;; consists of alternating pairs of style / text in an array.
 
 (defn normalise-line-data-array
-  "Normalise 'shorthand' representation [style1 string1 {:style style2 :text string2} style2 string3]
-(a line data array) to vector of maps. Also expand [] to a single blank span."
+  "Normalise 'shorthand' representation [style1 string1 {:style
+   style2 :text string2} style2 string3] (a *line data array*) to vector
+   of maps. Also expand [] to (vector of) a single blank span."
   [lda]
   (if (empty? lda)
     [{:style "" :text ""}]
-    (let [chunks (partition-by map? lda)
-          convert-seq (fn [s] (for [[style string] (partition 2 s)] {:style style :text string}))
-          homogenised-chunks (mapcat
-                              (fn [chunk]
-                                (if (map? (first chunk))
-                                  chunk
-                                  (convert-seq chunk)))
-                              chunks)]
-      (vec homogenised-chunks))))
+    (->> (partition-by map? lda)
+         (mapcat (while-not (comp map? first)
+                            (map-slurper :style :text)))
+         (vec))))
 
 (defn append-content-paragraphs
-  "Joins [{:content LINE_DATA_ARRAY] :append boolean}] to vector of
-  LINE_DATA_ARRAYs. Expects line data array to be normalised."
+  "Take a content update instruction [{:content LINE_DATA_ARRAY] :append boolean}...]
+   and incorporate into vector of line data arrays."
   [current updates]
-  {:pre (vector? current)}
-  (let [para-groups (partition-by (comp boolean :append) updates)]
-    (vec
-     (reduce
-      (fn [current para-group]
-        (if (:append (first para-group))
-          ;; a groups of :append true paragraphs
-          (let [prologue (or (vec (butlast current)) [])
-                old-tail (or (last current) [])
-                new-tail (mapcat :content para-group)]
-            (conj prologue (concat (last current) new-tail)))
+  {:pre [(vector? current)]
+   :post [vector?]}
+  (reduce
+   (fn [c {:keys [content append]}]
+     (if append
+       (conj (pop c) (concat (last c) (normalise-line-data-array content)))
+       (conj c (normalise-line-data-array content))))
+   current
+   updates))
 
-          ;; a group of stand alone paragraphs
-          (let [paras (map :content para-group)]
-            (concat current paras))))
-      current
-      para-groups))))
+;; A buffer window is represented as map of:
+;; :id
+;; :type :buffer
+;; :blocks (vector of line data arrays)
+;; :input input information
+;;
+;; A grid window is represented as map of:
+;;
+;; :id
+;; :type :grid
+;; :blocks (vector of strings?)
+;; :input input information
 
-(defn apply-content-update
-  "Apply a content update to the window it applies to."
-  [{:keys [clear text lines]} w]
-  (let [normalise-content (fn [t]
-                            (map
-                             (fn [u]
-                               (update-in u [:content] normalise-line-data-array))
-                             t))]
-    (case (:type w)
-      :buffer (let [w (if clear (assoc w :text []) w)]
-                (assoc w :blocks (append-content-paragraphs (:blocks w)
-                                                            (normalise-content text))))
-      :grid (assoc w :blocks (map :content (sort-by :line (normalise-content lines)))))))
+;; An update message contains updates for content, input and windows
+;; (the latter being dimensions etc.).
 
-(defn apply-content-updates
-  "Apply map of content updates to the window list."
-  [content-updates windows]
-  (let [update-map (group-by :id content-updates)]
-    (vec
-     (map
-      (fn [w]
-        (if-let [[u] (update-map (:id w))]
-          (apply-content-update u w)
-          w))
-      windows))))
+(defn update-window-content
+  "Apply a content update to the specified window."
+  [w {:keys [clear text lines]}]
+  (case (:type w)
+    
+    :buffer
+    (assoc w :blocks (append-content-paragraphs (if clear [] (:blocks w)) text))
 
-(defn apply-input-update
-  "Apply an input update map to the window it applies to."
+    :grid
+    (assoc w :blocks (->> (sort-by :line lines)
+                          (map :content)
+                          (map normalise-line-data-array)
+                          (vec)))))
+
+(defn update-window-input
+  "Apply an input update map to the specified window."
   [u w]
   (assoc w :input (dissoc u :id)))
 
-(defn apply-input-updates
-  "Apply a seq of input updates to the window list."
-  [input-updates windows]
-  (let [input-map (group-by :id input-updates)]
+(defn update-window-geom
+  "Apply a window geometry update to the specified window. Geometry
+   currently not supported but data is incorporated by merge."
+  [u w]
+  (merge u (dissoc w :id)))
+
+(defn update-windows
+  "Apply a seq of window updates to a vector of windows, reconciling
+   update to relevant window by :id and incorporating update using
+   updatefn which takes existing window and update and returns new window."
+  [content-updates updatefn windows]
+  (let [updates-for (group-by :id content-updates)]
     (vec
-     (map
-      (fn [w]
-        (if-let [[i] (input-map (:id w))]
-          (apply-input-update i w)
-          w))
-      windows))))
+     (for [w windows]
+       (if-let [updates (updates-for (:id w))]
+         (reduce updatefn w updates)
+         w)))))
 
-(defn apply-update
-  "Apply an update message to the game state."
-  [{content-updates :content input-updates :input :as msg} g]
-  {:pre [(not (nil? g))]}
-  (-> g
-      (update-in [:windows] (partial apply-content-updates content-updates))
-      (update-in [:windows] (partial apply-input-updates input-updates))))
+;; TODO support disable & specialinput
+(defn apply-update-message
+  "Apply a full window update map to game windows."
+  [game {:keys [content input window disable specialinput]}]
+  (update-in game [:windows]
+             #(->> %
+                   (update-windows content update-window-content)
+                   (update-windows input update-window-input)
+                   (update-windows window update-window-geom))))
 
-(defn apply-updates-to-windows
-  "https://github.com/swannodette/om/issues/110"
-  [{content-updates :content input-updates :input :as msg} windows]
-  (->> windows
-       (apply-content-updates content-updates)
-       (apply-input-updates input-updates)))
+;; game state is map of:
+;;
+;; :windows vector of windows
+;; :error error message TODO how is this cleared?
+(defn apply-message [msg game]
+  (case (:type msg)
+    :update (apply-update-message game msg)
+    :retry game ;; TODO support retry
+    :pass game
+    :error (assoc game :error (:message msg))))
 
-;; UI
+;;; UI
 
 (defn handle-keydown
   "Handle input event in buffer window and send down the window's input channel."
@@ -186,7 +209,7 @@ respond to incoming requests from the game."
     (will-mount [_]
       (go-loop []
         (when-let [msg (<! control-channel)]
-          (om/transact! game [:windows] #(apply-updates-to-windows msg %))
+          (om/transact! game #(apply-message msg %))
           (recur))))
 
     om/IDidMount
